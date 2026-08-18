@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="vi" class="h-full bg-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Café POS - Quản Lý & Tính Tiền Quán Cafe</title>
+    
+    <!-- PWA Web App Meta Tags -->
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Café POS">
+    <meta name="theme-color" content="#78350f">
+    <meta name="description" content="Phần mềm quản lý tính tiền quán cafe đa nền tảng offline/online">
+    
+    <!-- Dynamic Manifest Injection Tag -->
+    <link id="manifest-placeholder" rel="manifest">
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        coffee: {
+                            50: '#fffbeb',
+                            100: '#fef3c7',
+                            500: '#b45309',
+                            700: '#78350f',
+                            800: '#92400e',
+                            900: '#451a03',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        /* Thermal Receipt Print Styling */
+        @media print {
+            body * { visibility: hidden; }
+            #receipt-print-area, #receipt-print-area * { visibility: visible; }
+            #receipt-print-area { position: absolute; left: 0; top: 0; width: 100%; max-width: 80mm; font-size: 12px; }
+            .no-print { display: none !important; }
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="h-full flex flex-col overflow-hidden text-slate-800 select-none">
+    <!-- Top Header Bar -->
+    <header class="bg-coffee-900 text-white shadow-md z-20 flex-shrink-0">
+        <div class="max-w-7xl mx-auto px-3 py-2.5 flex items-center justify-between">
+            <div class="flex items-center space-x-3">
+                <div class="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center text-coffee-900 font-bold text-lg shadow-inner">
+                    <i class="fa-solid fa-mug-hot"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-base md:text-lg leading-tight flex items-center gap-2">
+                        <span id="shop-name-display">Aroma Café</span>
+                        <span class="text-xs font-normal bg-amber-600/40 text-amber-200 px-2 py-0.5 rounded-full border border-amber-500/30">POS 2.5 App</span>
+                    </h1>
+                    <p class="text-[11px] text-amber-200/80 flex items-center gap-1">
+                        <span class="inline-block w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span id="current-time-str">00:00:00</span>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Header Quick Controls -->
+            <div class="flex items-center space-x-2">
+                <button onclick="openModal('package-guide-modal')" class="bg-amber-600 hover:bg-amber-500 text-white text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 font-medium transition shadow-sm">
+                    <i class="fa-solid fa-box-archive"></i> <span class="hidden sm:inline">Đóng Gói App</span>
+                </button>
+                <button onclick="togglePWAInstallPrompt()" id="install-pwa-btn" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1.5 font-medium transition shadow-sm">
+                    <i class="fa-solid fa-download"></i> <span>Cài Đặt App</span>
+                </button>
+                <div class="bg-coffee-800/80 px-3 py-1 rounded-lg border border-amber-800/50 text-right hidden sm:block">
+                    <span class="text-[10px] text-amber-300 block font-medium uppercase tracking-wider">Bàn Đang Khách</span>
+                    <span id="active-tables-badge" class="text-xs font-bold text-emerald-300">0 / 0</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden relative">
+        <!-- Sidebar Navigation -->
+        <nav class="bg-white border-r border-slate-200 flex-shrink-0 flex md:flex-col justify-between w-full md:w-20 lg:w-56 fixed md:static bottom-0 left-0 z-30 shadow-lg md:shadow-none h-16 md:h-auto border-t md:border-t-0">
+            <div class="flex md:flex-col w-full justify-around md:justify-start p-1 md:p-2 md:space-y-1">
+                <button onclick="switchTab('pos')" id="nav-pos" class="nav-btn active flex flex-col lg:flex-row items-center lg:space-x-3 px-3 py-2 rounded-xl text-amber-800 bg-amber-50 font-semibold transition text-xs lg:text-sm w-full">
+                    <i class="fa-solid fa-store text-lg mb-0.5 lg:mb-0 w-6 text-center"></i>
+                    <span>Bán Hàng</span>
+                </button>
+                <button onclick="switchTab('tables')" id="nav-tables" class="nav-btn flex flex-col lg:flex-row items-center lg:space-x-3 px-3 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-medium transition text-xs lg:text-sm w-full">
+                    <i class="fa-solid fa-cubes text-lg mb-0.5 lg:mb-0 w-6 text-center"></i>
+                    <span>Sơ Đồ Bàn</span>
+                </button>
+                <button onclick="switchTab('reports')" id="nav-reports" class="nav-btn flex flex-col lg:flex-row items-center lg:space-x-3 px-3 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-medium transition text-xs lg:text-sm w-full">
+                    <i class="fa-solid fa-chart-pie text-lg mb-0.5 lg:mb-0 w-6 text-center"></i>
+                    <span>Doanh Thu</span>
+                </button>
+                <button onclick="switchTab('menu-mgr')" id="nav-menu-mgr" class="nav-btn flex flex-col lg:flex-row items-center lg:space-x-3 px-3 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-medium transition text-xs lg:text-sm w-full">
+                    <i class="fa-solid fa-utensils text-lg mb-0.5 lg:mb-0 w-6 text-center"></i>
+                    <span>Thực Đơn</span>
+                </button>
+                <button onclick="switchTab('history')" id="nav-history" class="nav-btn flex flex-col lg:flex-row items-center lg:space-x-3 px-3 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-medium transition text-xs lg:text-sm w-full">
+                    <i class="fa-solid fa-clock-rotate-left text-lg mb-0.5 lg:mb-0 w-6 text-center"></i>
+                    <span>Lịch Sử</span>
+                </button>
+                <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn flex flex-col lg:flex-row items-center lg:space-x-3 px-3 py-2 rounded-xl text-slate-600 hover:bg-slate-100 font-medium transition text-xs lg:text-sm w-full">
+                    <i class="fa-solid fa-gear text-lg mb-0.5 lg:mb-0 w-6 text-center"></i>
+                    <span>Cài Đặt</span>
+                </button>
+            </div>
+            
+            <div class="hidden md:block p-3 border-t border-slate-100 text-center text-xs text-slate-400">
+                <p>Thiết Bị: <span class="font-medium text-slate-600" id="device-type-label">Desktop</span></p>
+            </div>
+        </nav>
+
+        <main class="flex-1 overflow-y-auto pb-16 md:pb-0 bg-slate-50 flex flex-col md:flex-row">
+            
+            <!-- SECTION 1: POS VIEW -->
+            <div id="view-pos" class="tab-content flex-1 flex flex-col md:flex-row h-full overflow-hidden w-full">
+                <!-- Left Column: Menu Selection -->
+                <div class="flex-1 flex flex-col h-full overflow-hidden border-r border-slate-200 bg-slate-50">
+                    <!-- Table Bar & Search -->
+                    <div class="p-3 bg-white border-b border-slate-200 flex items-center justify-between gap-2 shadow-sm">
+                        <div class="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5 flex-1" id="pos-table-selector-container"></div>
+                        <button onclick="switchTab('tables')" class="text-xs bg-amber-100 text-amber-800 hover:bg-amber-200 px-2.5 py-1.5 rounded-lg font-medium whitespace-nowrap flex items-center gap-1 flex-shrink-0">
+                            <i class="fa-solid fa-map"></i> Sơ đồ
+                        </button>
+                    </div>
+
+                    <div class="p-3 bg-white border-b border-slate-200 space-y-2">
+                        <div class="relative">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                            <input type="text" id="menu-search-input" onkeyup="filterMenuItems()" placeholder="Tìm món (vd: Cà phê sữa, Trà đào...)" class="w-full pl-9 pr-3 py-2 bg-slate-100 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition">
+                        </div>
+                        <div class="flex items-center space-x-1.5 overflow-x-auto py-1 no-scrollbar" id="category-pills"></div>
+                    </div>
+
+                    <!-- Menu Grid Container -->
+                    <div class="flex-1 overflow-y-auto p-3" id="menu-grid-container">
+                        <!-- Danh sách món ăn sẽ được render tự động qua JS -->
+                    </div>
+                </div>
+
+                <!-- Right Column: Current Order Cart -->
+                <div class="w-full md:w-96 lg:w-[420px] bg-white flex flex-col h-full shadow-lg border-l border-slate-200 flex-shrink-0">
+                    <div class="p-3.5 bg-coffee-900 text-white flex items-center justify-between">
+                        <div class="flex items-center gap-2">
+                            <i class="fa-solid fa-receipt text-amber-400"></i>
+                            <span class="font-bold text-sm" id="current-order-title">Đơn hàng - Bàn Mang Về</span>
+                        </div>
+                        <button onclick="clearCurrentOrder()" class="text-xs bg-red-600/80 hover:bg-red-600 text-white px-2.5 py-1 rounded-lg transition flex items-center gap-1">
+                            <i class="fa-solid fa-trash-can"></i> Xóa hết
+                        </button>
+                    </div>
+
+                    <!-- Cart Item List -->
+                    <div class="flex-1 overflow-y-auto p-3 divide-y divide-slate-100" id="cart-items-container">
+                        <div class="h-full flex flex-col items-center justify-center text-slate-400 text-center py-10">
+                            <i class="fa-solid fa-mug-saucer text-4xl mb-2 text-slate-300"></i>
+                            <p class="text-sm font-medium">Chưa có món nào trong đơn</p>
+                            <p class="text-xs text-slate-400 mt-0.5">Chọn món ở danh sách bên trái để bắt đầu</p>
+                        </div>
+                    </div>
+
+                    <!-- Order Summary & Action Bar -->
+                    <div class="p-3.5 bg-slate-50 border-t border-slate-200 space-y-2.5">
+                        <div class="space-y-1.5 text-xs">
+                            <div class="flex justify-between text-slate-600">
+                                <span>Tạm tính:</span>
+                                <span class="font-semibold" id="cart-subtotal">0 đ</span>
+                            </div>
+                            <div class="flex justify-between items-center text-slate-600">
+                                <span class="flex items-center gap-1">Giảm giá: 
+                                    <button onclick="openDiscountModal()" class="text-amber-600 hover:underline"><i class="fa-solid fa-pen-to-square"></i></button>
+                                </span>
+                                <span class="font-semibold text-red-600" id="cart-discount">0 đ</span>
+                            </div>
+                            <div class="flex justify-between text-base font-bold text-coffee-900 pt-1.5 border-t border-slate-200">
+                                <span>Tổng cộng:</span>
+                                <span class="text-amber-700" id="cart-total">0 đ</span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <button onclick="saveOrderPending()" class="bg-amber-100 hover:bg-amber-200 text-amber-900 font-semibold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition">
+                                <i class="fa-solid fa-bookmark"></i> Lưu Tạm (Bếp)
+                            </button>
+                            <button onclick="openCheckoutModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition shadow-sm">
+                                <i class="fa-solid fa-cash-register"></i> Thanh Toán
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 2: TABLES VIEW -->
+            <div id="view-tables" class="tab-content hidden flex-1 p-4 overflow-y-auto w-full">
+                <!-- Nội dung Sơ đồ bàn sẽ hiển thị ở đây -->
+            </div>
+
+            <!-- SECTION 3: REPORTS VIEW -->
+            <div id="view-reports" class="tab-content hidden flex-1 p-4 overflow-y-auto w-full">
+                <!-- Nội dung Doanh thu sẽ hiển thị ở đây -->
+            </div>
+
+            <!-- SECTION 4: MENU MANAGEMENT VIEW -->
+            <div id="view-menu-mgr" class="tab-content hidden flex-1 p-4 overflow-y-auto w-full">
+                <!-- Nội dung Quản lý thực đơn sẽ hiển thị ở đây -->
+            </div>
+
+            <!-- SECTION 5: HISTORY VIEW -->
+            <div id="view-history" class="tab-content hidden flex-1 p-4 overflow-y-auto w-full">
+                <!-- Nội dung Lịch sử đơn hàng sẽ hiển thị ở đây -->
+            </div>
+
+            <!-- SECTION 6: SETTINGS VIEW -->
+            <div id="view-settings" class="tab-content hidden flex-1 p-4 overflow-y-auto w-full">
+                <!-- Nội dung Cài đặt sẽ hiển thị ở đây -->
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Script Placeholder (Nơi tích hợp mã JavaScript xử lý POS của bạn) -->
+    <script>
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById('view-' + tabId).classList.remove('hidden');
+            
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('active', 'text-amber-800', 'bg-amber-50', 'font-semibold');
+                btn.classList.add('text-slate-600', 'hover:bg-slate-100', 'font-medium');
+            });
+            const activeBtn = document.getElementById('nav-' + tabId);
+            if(activeBtn) {
+                activeBtn.classList.add('active', 'text-amber-800', 'bg-amber-50', 'font-semibold');
+                activeBtn.classList.remove('text-slate-600', 'hover:bg-slate-100', 'font-medium');
+            }
+        }
+    </script>
+</body>
+</html>
